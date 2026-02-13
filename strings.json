@@ -1,0 +1,38 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Hisense TV",
+        "description": "Enter the IP address of your Hisense TV.\nAfter clicking \"Next\", a PIN code will appear on the TV screen.",
+        "data": {
+          "tv_ip": "TV IP address"
+        },
+        "data_description": {
+          "tv_ip": "IP address of the TV on the local network (e.g. 192.168.1.100)"
+        }
+      },
+      "pin": {
+        "title": "Authentication ({tv_ip})",
+        "description": "MAC address: {mac_address}\n\nEnter the 4-digit PIN code displayed on the TV screen.",
+        "data": {
+          "mac_address": "MAC address",
+          "pin_code": "PIN code"
+        },
+        "data_description": {
+          "mac_address": "MAC address of the TV (detected automatically)",
+          "pin_code": "4-digit code from the TV screen"
+        }
+      }
+    },
+    "error": {
+      "invalid_ip": "Invalid IP address format",
+      "invalid_pin": "PIN code must be 4 digits",
+      "wrong_pin": "Incorrect PIN code. Please try again",
+      "cannot_connect": "Could not connect to the TV. Make sure it is turned on",
+      "auth_error": "Authentication error"
+    },
+    "abort": {
+      "already_configured": "This TV is already configured"
+    }
+  }
+}
