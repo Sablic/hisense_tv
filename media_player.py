@@ -32,8 +32,6 @@ SUPPORTED_FEATURES = (
     | MediaPlayerEntityFeature.SELECT_SOURCE
 )
 
-# Fallback sources if TV is unreachable
-FALLBACK_SOURCES = ["TV", "HDMI1", "HDMI2", "HDMI3"]
 
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
@@ -68,7 +66,7 @@ class HisenseTVEntity(MediaPlayerEntity):
         self._attr_state = MediaPlayerState.OFF
         self._attr_volume_level = 0.5
         self._attr_source = None
-        self._attr_source_list = FALLBACK_SOURCES.copy()
+        self._attr_source_list = []
         self._attr_is_volume_muted = False
         self._attr_available = True
         self._attr_app_name = None
