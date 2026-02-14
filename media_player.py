@@ -13,7 +13,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_time_interval
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from .const import DOMAIN
 
@@ -99,6 +99,42 @@ class HisenseTVEntity(MediaPlayerEntity):
     def supported_features(self):
         """Flag media player features that are supported."""
         return SUPPORTED_FEATURES
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return extra state attributes with connection info and token details."""
+        attrs: dict[str, Any] = {
+            "tv_ip": self._tv_ip,
+            "mac_address": self._mac_address,
+        }
+
+        # Access token info
+        access_token = self._connector._accesstoken
+        if access_token:
+            attrs["access_token"] = access_token[:12] + "…" if len(access_token) > 12 else access_token
+
+        access_time = self._connector._accesstoken_time
+        access_days = self._connector._accesstoken_duration_day
+        if access_time and int(access_time) > 0:
+            issued = datetime.fromtimestamp(int(access_time))
+            expires = datetime.fromtimestamp(int(access_time) + int(access_days) * 86400)
+            attrs["access_token_issued"] = issued.strftime("%Y-%m-%d %H:%M:%S")
+            attrs["access_token_expires"] = expires.strftime("%Y-%m-%d %H:%M:%S")
+
+        # Refresh token info
+        refresh_token = self._connector._refreshtoken
+        if refresh_token:
+            attrs["refresh_token"] = refresh_token[:12] + "…" if len(refresh_token) > 12 else refresh_token
+
+        refresh_time = self._connector._refreshtoken_time
+        refresh_days = self._connector._refreshtoken_duration_day
+        if refresh_time and int(refresh_time) > 0:
+            issued = datetime.fromtimestamp(int(refresh_time))
+            expires = datetime.fromtimestamp(int(refresh_time) + int(refresh_days) * 86400)
+            attrs["refresh_token_issued"] = issued.strftime("%Y-%m-%d %H:%M:%S")
+            attrs["refresh_token_expires"] = expires.strftime("%Y-%m-%d %H:%M:%S")
+
+        return attrs
 
     @property
     def should_poll(self):
