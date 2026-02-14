@@ -145,12 +145,12 @@ class HisenseTVEntity(MediaPlayerEntity):
                 self._attr_state = MediaPlayerState.OFF
                 self._attr_available = True
             elif "fake_sleep" in tv_state.get("statetype", ""):
-                # TV in sleep → OFF
-                self._attr_state = MediaPlayerState.OFF
+                # TV in sleep mode → STANDBY
+                self._attr_state = MediaPlayerState.STANDBY
                 self._attr_available = True
             else:
-                # TV is on → IDLE, and query volume + sources
-                self._attr_state = MediaPlayerState.IDLE
+                # TV is on → ON, and query volume + sources
+                self._attr_state = MediaPlayerState.ON
                 self._attr_available = True
                 await self._async_update_volume()
                 await self._async_update_sources()
@@ -245,7 +245,7 @@ class HisenseTVEntity(MediaPlayerEntity):
                 return
 
             self._refreshing_tokens = True
-            tv_was_off = self._attr_state == MediaPlayerState.OFF
+            tv_was_off = self._attr_state in (MediaPlayerState.OFF, MediaPlayerState.STANDBY)
 
             _LOGGER.warning(
                 "Token expires within 1 hour for %s! Starting refresh procedure (TV was %s)",
@@ -317,33 +317,45 @@ class HisenseTVEntity(MediaPlayerEntity):
     async def async_turn_on(self):
         """Turn the media player on.
 
-        Strategy:
-        1. Try MQTT KEY_POWER (works if TV is in standby with MQTT reachable)
-        2. If MQTT fails, fall back to Wake-on-LAN magic packet
+        Strategy based on current state:
+        - STANDBY (fake_sleep): MQTT is reachable → send KEY_POWER via MQTT
+        - OFF (MQTT unreachable): send Wake-on-LAN magic packet
         """
-        _LOGGER.info("Turning on %s — trying MQTT first...", self._tv_name)
-        success = await self._hass.async_add_executor_job(
-            self._connector.power_on
-        )
+        current = self._attr_state
 
-        if success:
-            _LOGGER.info("TV %s: power on sent via MQTT", self._tv_name)
-        else:
-            # MQTT unreachable — use WOL
+        if current == MediaPlayerState.STANDBY:
+            # TV is in standby, MQTT is available → wake via MQTT
+            _LOGGER.info("TV %s is in STANDBY, sending KEY_POWER via MQTT", self._tv_name)
+            await self._hass.async_add_executor_job(
+                self._connector.power_on
+            )
+        elif current == MediaPlayerState.OFF:
+            # TV is fully off, MQTT unreachable → WOL
             if not self._mac_address:
-                _LOGGER.warning("Cannot turn on %s: MQTT failed and no MAC address", self._tv_name)
+                _LOGGER.warning("Cannot turn on %s: no MAC address for WOL", self._tv_name)
                 return
-            _LOGGER.info("MQTT unreachable, sending WOL to %s (%s)", self._tv_name, self._mac_address)
+            _LOGGER.info("TV %s is OFF, sending WOL to %s", self._tv_name, self._mac_address)
             await self._hass.async_add_executor_job(
                 self._send_wol, self._mac_address
             )
+        else:
+            # Already ON or PLAYING — nothing to do
+            _LOGGER.debug("TV %s is already in state %s, ignoring turn_on", self._tv_name, current)
+            return
 
         # Optimistically set state, polling will confirm
-        self._attr_state = MediaPlayerState.IDLE
+        self._attr_state = MediaPlayerState.ON
         self.async_write_ha_state()
 
     async def async_turn_off(self):
         """Turn the media player off via MQTT KEY_POWER."""
+        current = self._attr_state
+
+        if current in (MediaPlayerState.OFF, MediaPlayerState.STANDBY):
+            # Already off or in standby — nothing to do
+            _LOGGER.debug("TV %s is already %s, ignoring turn_off", self._tv_name, current)
+            return
+
         _LOGGER.info("Turning off %s via MQTT", self._tv_name)
         success = await self._hass.async_add_executor_job(
             self._connector.power_off
@@ -426,7 +438,7 @@ class HisenseTVEntity(MediaPlayerEntity):
             )
             if success:
                 self._attr_source = source
-                self._attr_state = MediaPlayerState.IDLE
+                self._attr_state = MediaPlayerState.ON
                 self.async_write_ha_state()
             return
 
